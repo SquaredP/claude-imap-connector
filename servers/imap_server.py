@@ -38,6 +38,8 @@ def read_message():
     headers = {}
     while True:
         line = sys.stdin.buffer.readline()
+        if not line:  # EOF: client closed stdin
+            return None
         if line == b"\r\n" or line == b"\n":
             break
         if b":" in line:
