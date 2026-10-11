@@ -8,6 +8,8 @@
         "IMAP_PORT": "${IMAP_PORT}",
         "SMTP_HOST": "${SMTP_HOST}",
         "SMTP_PORT": "${SMTP_PORT}",
+        "TLS_CA_FILE": "${TLS_CA_FILE:-}",
+        "TLS_VERIFY": "${TLS_VERIFY:-true}",
         "EMAIL_ADDRESS": "${EMAIL_ADDRESS}",
         "EMAIL_PASSWORD": "${EMAIL_PASSWORD}"
       }

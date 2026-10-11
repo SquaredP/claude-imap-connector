@@ -47,6 +47,8 @@ Thank you for your interest in contributing to the Claude IMAP Connector! This M
            "IMAP_PORT": "993",
            "SMTP_HOST": "smtp.your-provider.com",
            "SMTP_PORT": "587",
+           "TLS_CA_FILE": "",
+           "TLS_VERIFY": "true",
            "EMAIL_ADDRESS": "your-email@example.com",
            "EMAIL_PASSWORD": "your-app-password"
          }

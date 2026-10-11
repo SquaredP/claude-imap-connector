@@ -24,6 +24,8 @@ Set these in your system environment or Claude configuration:
 | `IMAP_PORT` | IMAP server port (default: 993) | `993` |
 | `SMTP_HOST` | SMTP server hostname | `smtp.ionos.de` |
 | `SMTP_PORT` | SMTP server port (default: 587) | `587` |
+| `TLS_CA_FILE` | Optional PEM file with extra trusted certificate(s), for self-signed servers | `/etc/ssl/my-mail.pem` |
+| `TLS_VERIFY` | Set to `false` to skip certificate checks (insecure, default: `true`) | `true` |
 | `EMAIL_ADDRESS` | Your email address (used for login) | `your-email@example.com` |
 | `EMAIL_PASSWORD` | Email password or app-specific password | `your-password` |
 
@@ -72,6 +74,7 @@ The connector exposes these tools for direct use:
 
 - **Connection refused**: Verify IMAP_HOST and SMTP_HOST are correct for your provider
 - **Authentication failed**: Double-check EMAIL_ADDRESS and EMAIL_PASSWORD; some providers require app-specific passwords
+- **Certificate verify failed**: Your server likely uses a self-signed certificate. Export it (e.g. `openssl s_client -connect imap.example.com:993 -showcerts`) and point `TLS_CA_FILE` at it. `TLS_VERIFY=false` also works but lets anyone on the network path read your password.
 - **Folder not found**: Use `/mail-check` with `list_folders` to see available folder names — they vary by provider and language
 
 ## Quick Start
