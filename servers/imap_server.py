@@ -82,6 +82,14 @@ def get_imap_connection():
     return conn
 
 
+def get_capabilities(conn):
+    """Return the post-login capability set (it can differ from the pre-login one)."""
+    status, data = conn.capability()
+    if status != "OK" or not data or data[0] is None:
+        return set()
+    return set(data[0].decode().upper().split())
+
+
 def decode_mime_header(raw):
     """Decode a MIME-encoded header value to a plain string."""
     if raw is None:
@@ -175,7 +183,7 @@ def tool_list_emails(folder="INBOX", limit=20, offset=0):
         if status != "OK":
             return {"error": f"Could not open folder: {folder}"}
 
-        status, data = conn.search(None, "ALL")
+        status, data = conn.uid("SEARCH", "ALL")
         if status != "OK":
             return {"emails": [], "total": 0}
 
@@ -187,7 +195,7 @@ def tool_list_emails(folder="INBOX", limit=20, offset=0):
 
         emails = []
         for uid in page:
-            status, msg_data = conn.fetch(uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
+            status, msg_data = conn.uid("FETCH", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
             if status == "OK" and msg_data[0] is not None:
                 raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
                 msg = email.message_from_bytes(raw, policy=policy.default)
@@ -208,7 +216,7 @@ def tool_read_email(email_id, folder="INBOX"):
     conn = get_imap_connection()
     try:
         conn.select(f'"{folder}"', readonly=True)
-        status, msg_data = conn.fetch(str(email_id).encode(), "(RFC822)")
+        status, msg_data = conn.uid("FETCH", str(email_id), "(RFC822)")
         if status != "OK" or msg_data[0] is None:
             return {"error": f"Email {email_id} not found in {folder}"}
 
@@ -271,7 +279,7 @@ def tool_search_emails(query, folder="INBOX", limit=20):
                 criteria.append(f'OR SUBJECT "{clean_query}" BODY "{clean_query}"')
 
         search_str = " ".join(criteria) if criteria else "ALL"
-        status, data = conn.search(None, f'({search_str})')
+        status, data = conn.uid("SEARCH", f'({search_str})')
 
         if status != "OK":
             return {"emails": [], "total": 0, "query": search_str}
@@ -282,7 +290,7 @@ def tool_search_emails(query, folder="INBOX", limit=20):
 
         emails = []
         for uid in ids:
-            status, msg_data = conn.fetch(uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
+            status, msg_data = conn.uid("FETCH", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
             if status == "OK" and msg_data[0] is not None:
                 raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
                 msg = email.message_from_bytes(raw, policy=policy.default)
@@ -320,7 +328,7 @@ def tool_send_email(to, subject, body, cc="", bcc="", reply_to_id="", reply_to_f
         try:
             conn = get_imap_connection()
             conn.select(f'"{reply_to_folder}"', readonly=True)
-            status, msg_data = conn.fetch(str(reply_to_id).encode(), "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID REFERENCES)])")
+            status, msg_data = conn.uid("FETCH", str(reply_to_id), "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID REFERENCES)])")
             if status == "OK" and msg_data[0] is not None:
                 raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
                 orig = email.message_from_bytes(raw, policy=policy.default)
@@ -353,14 +361,26 @@ def tool_move_email(email_id, source_folder="INBOX", target_folder="Archive"):
     """Move an email to a different folder."""
     conn = get_imap_connection()
     try:
-        conn.select(f'"{source_folder}"')
-        status, _ = conn.copy(str(email_id).encode(), f'"{target_folder}"')
-        if status == "OK":
-            conn.store(str(email_id).encode(), "+FLAGS", "\\Deleted")
-            conn.expunge()
-            return {"status": "moved", "email_id": str(email_id), "from": source_folder, "to": target_folder}
-        else:
+        status, _ = conn.select(f'"{source_folder}"')
+        if status != "OK":
+            return {"error": f"Could not open folder: {source_folder}"}
+        uid = str(email_id)
+        caps = get_capabilities(conn)
+        if "MOVE" in caps:
+            status, _ = conn.uid("MOVE", uid, f'"{target_folder}"')
+            if status != "OK":
+                return {"error": f"Failed to move email to {target_folder}"}
+            return {"status": "moved", "email_id": uid, "from": source_folder, "to": target_folder}
+        status, _ = conn.uid("COPY", uid, f'"{target_folder}"')
+        if status != "OK":
             return {"error": f"Failed to copy email to {target_folder}"}
+        conn.uid("STORE", uid, "+FLAGS", "(\\Deleted)")
+        if "UIDPLUS" in caps:
+            conn.uid("EXPUNGE", uid)
+            return {"status": "moved", "email_id": uid, "from": source_folder, "to": target_folder}
+        # No UIDPLUS: a plain EXPUNGE would also purge other \Deleted messages, so leave it flagged
+        return {"status": "copied", "email_id": uid, "from": source_folder, "to": target_folder,
+                "note": "Original flagged \\Deleted but not expunged (server lacks UIDPLUS)."}
     finally:
         conn.logout()
 
@@ -392,10 +412,18 @@ def tool_delete_email(email_id, folder="INBOX"):
             # Fallback: flag as deleted
             conn = get_imap_connection()
             try:
-                conn.select(f'"{folder}"')
-                conn.store(str(email_id).encode(), "+FLAGS", "\\Deleted")
-                conn.expunge()
-                return {"status": "deleted", "email_id": str(email_id), "folder": folder}
+                status, _ = conn.select(f'"{folder}"')
+                if status != "OK":
+                    return {"error": f"Could not open folder: {folder}"}
+                uid = str(email_id)
+                status, _ = conn.uid("STORE", uid, "+FLAGS", "(\\Deleted)")
+                if status != "OK":
+                    return {"error": f"Failed to flag email {uid}"}
+                if "UIDPLUS" in get_capabilities(conn):
+                    conn.uid("EXPUNGE", uid)
+                    return {"status": "deleted", "email_id": uid, "folder": folder}
+                return {"status": "flagged_deleted", "email_id": uid, "folder": folder,
+                        "note": "Flagged \\Deleted but not expunged (server lacks UIDPLUS)."}
             finally:
                 conn.logout()
     except Exception as e:
@@ -428,7 +456,7 @@ TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "email_id": {"type": "string", "description": "The email ID from list_emails"},
+                "email_id": {"type": "string", "description": "The email UID from list_emails"},
                 "folder": {"type": "string", "description": "Mailbox folder (default: INBOX)", "default": "INBOX"},
             },
             "required": ["email_id"],
