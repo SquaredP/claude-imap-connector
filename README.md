@@ -8,8 +8,8 @@ This MCP server enables Claude to interact with your email through natural langu
 
 - **Read emails** — browse your inbox and other folders
 - **Search** — find emails by sender, subject, date, or keywords
-- **Send** — compose and send emails via SMTP, including threaded replies
-- **Organize** — move emails between folders and delete messages
+- **Send** — compose and send emails via SMTP, including threaded replies (needs `IMAP_READ_ONLY=false`)
+- **Organize** — move emails between folders and delete messages (needs `IMAP_READ_ONLY=false`)
 - **List folders** — see all available mailbox folders
 
 ## Setup
@@ -26,6 +26,7 @@ Set these in your system environment or Claude configuration:
 | `SMTP_PORT` | SMTP server port (default: 587) | `587` |
 | `EMAIL_ADDRESS` | Your email address (used for login) | `your-email@example.com` |
 | `EMAIL_PASSWORD` | Email password or app-specific password | `your-password` |
+| `IMAP_READ_ONLY` | `true` (default) hides send, move and delete; set to `false` to enable them | `true` |
 
 ### Common Provider Settings
 
@@ -57,13 +58,14 @@ The connector exposes these tools for direct use:
 - `list_emails` — List emails in a folder with pagination
 - `read_email` — Read a single email's full content
 - `search_emails` — Search with structured queries (`from:`, `subject:`, `since:`, `before:`)
-- `send_email` — Send an email with optional CC/BCC and reply threading
-- `move_email` — Move an email between folders
-- `delete_email` — Move an email to trash
+- `send_email` — Send an email with optional CC/BCC and reply threading (needs `IMAP_READ_ONLY=false`)
+- `move_email` — Move an email between folders (needs `IMAP_READ_ONLY=false`)
+- `delete_email` — Move an email to trash (needs `IMAP_READ_ONLY=false`)
 
 ## Security Notes
 
 - Credentials are passed via environment variables and never stored in the plugin
+- Read-only by default: `send_email`, `move_email` and `delete_email` stay disabled until you set `IMAP_READ_ONLY=false`. Emails Claude reads can contain instructions aimed at Claude; with write access, such an email could get Claude to send or delete mail.
 - All IMAP connections use SSL/TLS (port 993)
 - SMTP connections use STARTTLS (port 587)
 - Emails are never sent without explicit user confirmation

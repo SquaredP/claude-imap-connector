@@ -19,4 +19,6 @@ If the user wants to reply to an existing email:
 - Read the original email for context
 - Use `reply_to_id` when sending to maintain the email thread
 
+If `send_email` reports that it is disabled, tell the user to set `IMAP_READ_ONLY=false` in their configuration and restart Claude.
+
 Write emails in the same language the user is using. Keep the tone appropriate to the context.

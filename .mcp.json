@@ -9,7 +9,8 @@
         "SMTP_HOST": "${SMTP_HOST}",
         "SMTP_PORT": "${SMTP_PORT}",
         "EMAIL_ADDRESS": "${EMAIL_ADDRESS}",
-        "EMAIL_PASSWORD": "${EMAIL_PASSWORD}"
+        "EMAIL_PASSWORD": "${EMAIL_PASSWORD}",
+        "IMAP_READ_ONLY": "${IMAP_READ_ONLY:-true}"
       }
     }
   }

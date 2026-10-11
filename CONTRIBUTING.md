@@ -48,7 +48,8 @@ Thank you for your interest in contributing to the Claude IMAP Connector! This M
            "SMTP_HOST": "smtp.your-provider.com",
            "SMTP_PORT": "587",
            "EMAIL_ADDRESS": "your-email@example.com",
-           "EMAIL_PASSWORD": "your-app-password"
+           "EMAIL_PASSWORD": "your-app-password",
+           "IMAP_READ_ONLY": "true"
          }
        }
      }

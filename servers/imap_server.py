@@ -13,6 +13,7 @@ Environment variables:
   SMTP_PORT      — SMTP server port (default: 587)
   EMAIL_ADDRESS  — Full email address for login
   EMAIL_PASSWORD — Password or app-specific password
+  IMAP_READ_ONLY — "true" (default) hides send/move/delete; "false" enables them
 """
 
 import os
@@ -406,6 +407,14 @@ def tool_delete_email(email_id, folder="INBOX"):
 # MCP Tool dispatch
 # ---------------------------------------------------------------------------
 
+WRITE_TOOLS = {"send_email", "move_email", "delete_email"}
+
+
+def is_read_only():
+    """Return True unless IMAP_READ_ONLY is set to false/0/no (default: true)."""
+    return os.environ.get("IMAP_READ_ONLY", "true").strip().lower() not in ("false", "0", "no")
+
+
 TOOLS = {
     "list_folders": {
         "description": "List all mailbox folders (INBOX, Sent, Drafts, etc.)",
@@ -490,6 +499,8 @@ TOOLS = {
 
 def dispatch_tool(name, arguments):
     """Call the appropriate tool function."""
+    if name in WRITE_TOOLS and is_read_only():
+        return {"error": f"{name} is disabled (IMAP_READ_ONLY is on)."}
     try:
         if name == "list_folders":
             return tool_list_folders()
@@ -568,6 +579,7 @@ def main():
             tool_list = [
                 {"name": name, "description": spec["description"], "inputSchema": spec["inputSchema"]}
                 for name, spec in TOOLS.items()
+                if not (name in WRITE_TOOLS and is_read_only())
             ]
             send_message(make_response(req_id, {"tools": tool_list}))
 
